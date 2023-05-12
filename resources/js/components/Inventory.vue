@@ -39,10 +39,12 @@ export default {
       searchTerm: '',
     };
   },
+  
   methods: {
     handleFileChange(event) {
       this.file = event.target.files[0];
     },
+
     uploadFile() {
       const formData = new FormData();
       formData.append('file', this.file);
@@ -57,24 +59,28 @@ export default {
           console.log(error);
         });
     },
+
     paginateData() {
       const startIndex = (this.currentPage - 1) * this.itemsPerPage;
       const endIndex = startIndex + this.itemsPerPage;
       this.paginatedData = this.data.slice(startIndex, endIndex);
       this.totalPages = Math.ceil(this.data.length / this.itemsPerPage);
     },
+
     prevPage() {
       if (this.currentPage > 1) {
         this.currentPage--;
         this.paginateData();
       }
     },
+
     nextPage() {
       if (this.currentPage < this.totalPages) {
         this.currentPage++;
         this.paginateData();
       }
     },
+
     searchData() {
       this.currentPage = 1;
       const searchResults = this.data.filter(item => {
