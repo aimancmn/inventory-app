@@ -50,7 +50,7 @@ export default {
       formData.append('file', this.file);
 
       axios
-        .post('/api/upload-excel', formData)
+        .post('/api/upload', formData)
         .then(response => {
           this.data = response.data;
           this.paginateData();

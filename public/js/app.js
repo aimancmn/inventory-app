@@ -5351,7 +5351,7 @@ __webpack_require__.r(__webpack_exports__);
       var _this = this;
       var formData = new FormData();
       formData.append('file', this.file);
-      axios.post('/api/upload-excel', formData).then(function (response) {
+      axios.post('/api/upload', formData).then(function (response) {
         _this.data = response.data;
         _this.paginateData();
       })["catch"](function (error) {
