@@ -11,6 +11,8 @@ class Product extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $fillable = ['serial_number', 'unit_price', 'quantity'];
+
     public function brands(): BelongsToMany
     {
         return $this->belongsToMany(Brand::class);
@@ -35,6 +37,4 @@ class Product extends Model
     {
         return $this->belongsToMany(Transaction::class, 'product_specification');
     }
-
-
 }

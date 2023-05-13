@@ -18,6 +18,7 @@ class CreateProductsTable extends Migration
             $table->string('serial_number', '100')->unique();
             $table->decimal('unit_price', 8, 2);
             $table->integer('quantity')->default(0);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

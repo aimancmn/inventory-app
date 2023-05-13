@@ -18,6 +18,7 @@ class CreateTransactionsTable extends Migration
             $table->string('transaction_no', 100)->unique(); 
             $table->string('transaction_type', 10)->comment('Describe the transaction purpose. Ex: Buy, Sell, Refund'); 
             $table->decimal('transaction_amount', 8, 2);
+            $table->integer('transaction_status')->comment('Describe whether the transaction is successful or failed');
             $table->timestamps();
         });
     }

@@ -52,7 +52,7 @@ export default {
       axios
         .post('/api/upload', formData)
         .then(response => {
-          this.data = response.data;
+          this.data = response.data.inventory;
           this.paginateData();
         })
         .catch(error => {

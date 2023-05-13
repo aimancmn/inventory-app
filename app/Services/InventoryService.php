@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\Transaction;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Calculation\Logical\Boolean;
 
@@ -43,33 +45,6 @@ class InventoryService
         return $response;
     }
 
-    public function updateInventory(array $inventory) : array
-    {
-        $response = [
-            'status' => false,
-        ];
-
-        $updatedInventory = array();
-
-        foreach($inventory as $key => $item){
-            
-            $isValidItem = $this->validateProduct($item['ProductID'], $item['Status']);
-            if( !$isValidItem['status'] ){
-                continue;
-            }
-
-            $updatedInventory[] = $isValidItem['item'];
-        }
-
-        $response['status']    = true;
-        $response['message']   = 'Data validated successfully.';
-        $response['inventory'] = $updatedInventory; 
-
-        Log::info('Inventory Service - Update Inventory Response : ', $response);
-
-        return $response;
-    }
-
     public function formatData(array $requestData) : array
     {
         $rawData = array();
@@ -86,46 +61,132 @@ class InventoryService
             $temp[str_replace(' ', '', $headerArr[4])] = $data[4];
             $temp[str_replace(' ', '', $headerArr[5])] = $data[5];
 
-            $rawData[] = $temp;
+            if($data[5] == 'Buy'){
+                $rawData['purchaseList'][] = $temp;
+            }else{
+                $rawData['soldList'][] = $temp;
+            }
         }
+
+        Log::info('Inventory Service - Format Data :', $rawData);
 
         return $rawData;
     }
 
-    public function validateProduct(string $productId, string $transactionType) : array
+    public function updateInventory(array $inventory) : array
+    {
+        $response = [
+            'status' => false,
+        ];
+
+        $validatedProductIds = array();
+
+        $purchasedItems = $inventory['purchaseList'] ?? [];
+        $soldItems      = $inventory['soldList'] ?? [];
+
+        if( !empty($purchasedItems) ){
+            foreach( $purchasedItems as $key => $purchaseItem ){
+                $validatedProduct = $this->validateProduct($purchaseItem, 'purchase');
+                if( $validatedProduct['status'] ){
+                    $product = $validatedProduct['product'];
+                    $validatedProductIds[] = $product->id;
+                }
+            }
+        }
+
+        if( !empty($soldItems) ){
+            foreach( $soldItems as $key => $soldItem ){
+                $validatedProduct = $this->validateProduct($purchaseItem, 'sold');
+                if( $validatedProduct['status'] ){
+                    $product = $validatedProduct['product'];
+                    $validatedProductIds[] = $product->id;
+                }
+            }
+        }
+
+        Log::info('Inventory Service - Update Inventory Response : ', $response);
+
+        // get latest record of all updated products
+        $products = Product::whereIn('id', array_unique($validatedProductIds))->get();
+
+        $response['status']    = true;
+        $response['message']   = 'Data validated successfully.';
+        $response['inventory'] = $products; 
+
+        Log::info('Inventory Service - Update Inventory Response : ', $response);
+
+        return $response;
+    }
+
+    public function validateProduct(array $item, string $transactionType) : array
     {
         $response = [
             'status' => false
         ];
-        
-        $product = Product::where('serial_number', $productId)->first();;
-        if( !$product->exists ){
 
-            if( $transactionType == 'Sold' ){
-                return $response;
-            }else{
-                $product->serial_number = $productId;
-                $product->unit_price    = 0.00;
-                $product->quantity      = $product->quantity + 1;
+        Log::info('Inventory Service - Validate Product Param : ', array('item'=>$item, 'transactionType'=>$transactionType));
+
+        // purchase means adding the quantity
+        if( $transactionType == 'purchase' ){
+            
+            $product = Product::firstOrCreate(
+                ['serial_number' => $item['ProductID']],
+                ['serial_number' => $item['ProductID'], 'unit_price' => 1.00, 'quantity' => 1]
+            ); 
+
+            // add quantity to existing record
+            if ( !$product->wasRecentlyCreated ) {
+                $product->quantity += 1;
+                $product->save();
+            }
+
+            $transactionNo = Carbon::today()->toDateString() . '-' . $product->serial_number . '-' . Carbon::now()->micro;
+            $transactionAmount = $product->unit_price * $product->quantity;
+
+            // add transaction record
+            $transaction = Transaction::create([
+                'transaction_no' => $transactionNo,
+                'transaction_type' => $transactionType,
+                'transaction_amount' => $transactionAmount,
+                'transaction_status' => 1,
+            ]);
+
+            $response['status'] = true;
+
+        }else if( $transactionType == 'sold' ){
+            $product = Product::where('serial_number', $item['ProductID'])->first();
+
+            if ($product && $product->exists() && $product->quantity > 0) {
+                $product->quantity -= 1;
                 $product->save();
 
-                return true;
+                $transactionNo = Carbon::today()->toDateString() . '-' . $product->serial_number . '-' . Carbon::now()->micro;
+                $transactionAmount = $product->unit_price * $product->quantity;
+
+                // add transaction record
+                $transaction = Transaction::create([
+                    'transaction_no' => $transactionNo,
+                    'transaction_type' => $transactionType,
+                    'transaction_amount' => $transactionAmount,
+                    'transaction_status' => 1
+                ]);
+
+                $response['status'] = true;
+
+            }else{                
+                $transactionNo = Carbon::today()->toDateString() . '-' . $item['ProductID'] . '-' . Carbon::now()->micro;
+
+                // add transaction record
+                $transaction = Transaction::create([
+                    'transaction_no' => $transactionNo,
+                    'transaction_type' => $transactionType,
+                    'transaction_amount' => 0.00,
+                    'transaction_status' => 0
+                ]);
             }
         }
 
-        if( $transactionType == 'Sold' ){
-            if( $product->quantity == 0 ){
-                return $response;
-            }
-
-            $product->quantity = $product->quantity - 1;
-            $product->save();
-        }else{
-            $product->quantity = $product->quantity + 1;
-            $product->save();   
-        }
-
-        $response['item'] = $product;
+        $response['product'] = ( $response['status'] ) ? $product : '';
 
         return $response;
     }

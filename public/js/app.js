@@ -5352,7 +5352,7 @@ __webpack_require__.r(__webpack_exports__);
       var formData = new FormData();
       formData.append('file', this.file);
       axios.post('/api/upload', formData).then(function (response) {
-        _this.data = response.data;
+        _this.data = response.data.inventory;
         _this.paginateData();
       })["catch"](function (error) {
         console.log(error);
